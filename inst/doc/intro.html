@@ -10,7 +10,7 @@
 
 <meta name="author" content="Jeroen Ooms" />
 
-<meta name="date" content="2015-02-14" />
+<meta name="date" content="2015-02-23" />
 
 <title>Working with JavaScript in R</title>
 
@@ -54,7 +54,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="header">
 <h1 class="title">Working with JavaScript in R</h1>
 <h4 class="author"><em>Jeroen Ooms</em></h4>
-<h4 class="date"><em>2015-02-14</em></h4>
+<h4 class="date"><em>2015-02-23</em></h4>
 </div>
 
 <div id="TOC">
@@ -62,7 +62,9 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <li><a href="#what-is-js">What is JS?</a></li>
 <li><a href="#syntax-validation">Syntax Validation</a></li>
 <li><a href="#script-validation">Script Validation</a></li>
-<li><a href="#uglify-reformatting-and-optimization">Uglify: reformatting and optimization</a></li>
+<li><a href="#compiling-coffeescript">Compiling CoffeeScript</a></li>
+<li><a href="#uglify-reformatting">Uglify: reformatting</a></li>
+<li><a href="#uglify-optimization">Uglify: optimization</a></li>
 <li><a href="#jshint-code-analysis">JSHint: code analysis</a></li>
 </ul>
 </div>
@@ -74,7 +76,7 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <div id="syntax-validation" class="section level2">
 <h2>Syntax Validation</h2>
 <p>Several R packages allow the user to supply JavaScript code to be used as callback function or configuration object within a visualization or web application. By validating in R that the JavaScript code is syntactically correct and of the right type before actually inserting it in the HTML, we can avoid many annoying bugs.</p>
-<p>The <code>js_typeof</code> function simply calls the <code>typeof</code> operator on the given code. If the code is syntactically invalid, a SyntaxError will be raised.</p>
+<p>The <code>js_typeof</code> function simply calls the <code>typeof</code> operator on the given code. If the code is invalid, a SyntaxError will be raised.</p>
 <pre class="sourceCode r"><code class="sourceCode r">callback &lt;-<span class="st"> 'function(x, y){ </span>
 <span class="st">  var z = x*y ;</span>
 <span class="st">  return z;</span>
@@ -103,10 +105,113 @@ code > span.er { color: #ff0000; font-weight: bold; }
 <pre><code>[1] FALSE</code></pre>
 <p>To validate individual functions or objects, use the <code>js_typeof</code> function.</p>
 </div>
-<div id="uglify-reformatting-and-optimization" class="section level2">
-<h2>Uglify: reformatting and optimization</h2>
-<p>One of the most popular and powerful libraries for working with JavaScript code is <a href="https://www.npmjs.com/package/uglify-js">uglify-js</a>. This package provides an extensive toolkit for manipulating the syntax tree of a piece of JavaScript code.</p>
-<p>The <code>uglify_reformat</code> function parses a JavaScript code and then feeds it to the <a href="http://lisperator.net/uglifyjs/codegen">uglify code generator</a> which converts it back to a JavaScript text, with custom formatting options. This is nice for fixing whitespace, semicolons, etc.</p>
+<div id="compiling-coffeescript" class="section level2">
+<h2>Compiling CoffeeScript</h2>
+<p><a href="http://coffeescript.org/">CoffeeScript</a> is a little language that compiles into JavaScript. It is an attempt to expose the good parts of JavaScript in a simple way. The <code>coffee_compile</code> function binds to the coffee script compiler.</p>
+<pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Hello world</span>
+<span class="kw">cat</span>(<span class="kw">coffee_compile</span>(<span class="st">&quot;square = (x) -&gt; x * x&quot;</span>))</code></pre>
+<pre><code>(function() {
+  var square;
+
+  square = function(x) {
+    return x * x;
+  };
+
+}).call(this);</code></pre>
+<pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cat</span>(<span class="kw">coffee_compile</span>(<span class="st">&quot;square = (x) -&gt; x * x&quot;</span>, <span class="dt">bare =</span> <span class="ot">TRUE</span>))</code></pre>
+<pre><code>var square;
+
+square = function(x) {
+  return x * x;
+};</code></pre>
+<p>The golden rule of CoffeeScript is: <em>“It’s just JavaScript”</em>. The code compiles one-to-one into the equivalent JS, and there is no interpretation at runtime. You can use any existing JavaScript library seamlessly from CoffeeScript (and vice-versa). The compiled output is readable and pretty-printed, will work in every JavaScript runtime, and tends to run as fast or faster than the equivalent handwritten JavaScript.</p>
+<pre class="sourceCode r"><code class="sourceCode r"><span class="co"># Simple script</span>
+demo &lt;-<span class="st"> </span><span class="kw">readLines</span>(<span class="kw">system.file</span>(<span class="st">&quot;example/demo.coffee&quot;</span>, <span class="dt">package =</span> <span class="st">&quot;js&quot;</span>))
+<span class="kw">cat</span>(demo, <span class="dt">sep =</span> <span class="st">&quot;</span><span class="ch">\n</span><span class="st">&quot;</span>)</code></pre>
+<pre><code># Assignment:
+number   = 42
+opposite = true
+
+# Conditions:
+number = -42 if opposite
+
+# Functions:
+square = (x) -&gt; x * x
+
+# Arrays:
+list = [1, 2, 3, 4, 5]
+
+# Objects:
+math =
+  root:   Math.sqrt
+  square: square
+  cube:   (x) -&gt; x * square x
+
+# Splats:
+race = (winner, runners...) -&gt;
+  print winner, runners
+
+# Existence:
+alert &quot;I knew it!&quot; if elvis?
+
+# Array comprehensions:
+cubes = (math.cube num for num in list)</code></pre>
+<pre class="sourceCode r"><code class="sourceCode r">js &lt;-<span class="st"> </span><span class="kw">coffee_compile</span>(demo)
+<span class="kw">cat</span>(js)</code></pre>
+<pre><code>(function() {
+  var cubes, list, math, num, number, opposite, race, square,
+    slice = [].slice;
+
+  number = 42;
+
+  opposite = true;
+
+  if (opposite) {
+    number = -42;
+  }
+
+  square = function(x) {
+    return x * x;
+  };
+
+  list = [1, 2, 3, 4, 5];
+
+  math = {
+    root: Math.sqrt,
+    square: square,
+    cube: function(x) {
+      return x * square(x);
+    }
+  };
+
+  race = function() {
+    var runners, winner;
+    winner = arguments[0], runners = 2 &lt;= arguments.length ? slice.call(arguments, 1) : [];
+    return print(winner, runners);
+  };
+
+  if (typeof elvis !== &quot;undefined&quot; &amp;&amp; elvis !== null) {
+    alert(&quot;I knew it!&quot;);
+  }
+
+  cubes = (function() {
+    var i, len, results;
+    results = [];
+    for (i = 0, len = list.length; i &lt; len; i++) {
+      num = list[i];
+      results.push(math.cube(num));
+    }
+    return results;
+  })();
+
+}).call(this);</code></pre>
+<pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cat</span>(<span class="kw">uglify_optimize</span>(js))</code></pre>
+<pre><code>(function(){var cubes,list,math,num,number,opposite,race,square,slice=[].slice;number=42,opposite=!0,opposite&amp;&amp;(number=-42),square=function(x){return x*x},list=[1,2,3,4,5],math={root:Math.sqrt,square:square,cube:function(x){return x*square(x)}},race=function(){var runners,winner;return winner=arguments[0],runners=2&lt;=arguments.length?slice.call(arguments,1):[],print(winner,runners)},&quot;undefined&quot;!=typeof elvis&amp;&amp;null!==elvis&amp;&amp;alert(&quot;I knew it!&quot;),cubes=function(){var i,len,results;for(results=[],i=0,len=list.length;len&gt;i;i++)num=list[i],results.push(math.cube(num));return results}()}).call(this);</code></pre>
+</div>
+<div id="uglify-reformatting" class="section level2">
+<h2>Uglify: reformatting</h2>
+<p>One of the most popular and powerful libraries for working with JavaScript code is <a href="https://www.npmjs.com/package/uglify-js">uglify-js</a>. Uglify provides an extensive toolkit for manipulating the syntax tree of a piece of JavaScript code.</p>
+<p>The <code>uglify_reformat</code> binding parses a string with code and then feeds it to the <a href="http://lisperator.net/uglifyjs/codegen">uglify code generator</a> which converts it back to JavaScript text, with custom formatting options. This is nice for fixing whitespace, semicolons, etc.</p>
 <pre class="sourceCode r"><code class="sourceCode r">code &lt;-<span class="st"> &quot;function test(x, y){ x = x || 1; y = y || 1; return x*y;}&quot;</span>
 <span class="kw">cat</span>(<span class="kw">uglify_reformat</span>(code, <span class="dt">beautify =</span> <span class="ot">TRUE</span>, <span class="dt">indent_level =</span> <span class="dv">2</span>))</code></pre>
 <pre><code>function test(x, y) {
@@ -114,7 +219,10 @@ code > span.er { color: #ff0000; font-weight: bold; }
   y = y || 1;
   return x * y;
 }</code></pre>
-<p>However the more impressive part of uglify-js is the <a href="http://lisperator.net/uglifyjs/compress">compressor</a> which refactors the entire syntax tree, effectively rewriting your code into a more compact but equivalent program. The <code>uglify_optimize</code> function in R is a simple wrapper which parses JavaScript and then feeds it to the compressor.</p>
+</div>
+<div id="uglify-optimization" class="section level2">
+<h2>Uglify: optimization</h2>
+<p>The more impressive part of uglify-js is the <a href="http://lisperator.net/uglifyjs/compress">compressor</a> which refactors the entire syntax tree, effectively rewriting your code into a more compact but equivalent program. The <code>uglify_optimize</code> function in R is a simple wrapper which parses code and then feeds it to the compressor.</p>
 <pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cat</span>(code)</code></pre>
 <pre><code>function test(x, y){ x = x || 1; y = y || 1; return x*y;}</code></pre>
 <pre class="sourceCode r"><code class="sourceCode r"><span class="kw">cat</span>(<span class="kw">uglify_optimize</span>(code))</code></pre>
